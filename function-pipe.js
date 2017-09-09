@@ -7,20 +7,65 @@ class CallFunctionAsArgument {
   }
 }
 
+class FpArgumentOrder {
+  constructor(...args) {
+    this.order = args;
+  }
+}
+
+class FpOutputPipes {
+  constructor(...args) {
+    this.pipes = args;
+  }
+}
+
+class FpErrorPipes {
+  constructor(...args) {
+    this.pipes = args;
+  }
+}
+
+class FpMapIndex {
+  constructor(...args) {
+    this.mapIndexes = args;
+  }
+}
+
 class FunctionPipe {
-  constructor(fn, inputOrder, outPipes) {
-    this.functionNumber = 0;
-    this.catchNumber = 0;
+  constructor(fn, ...args) {
+    this.mFunctionNumber = 0;
+    this.mCatchNumber = 0;
 
-    this.pipeOutBuffer = {};
-    this.pipeErrBuffer = {};
+    this.mPipeOutBuffer = {};
+    this.mPipeErrBuffer = {};
 
-    this.promise = Promise.resolve();
+    this.mPromise = Promise.resolve();
     this.run = true;
-    this.pipe(fn, inputOrder, outPipes);
+    this.pipe(fn, ...args);
   }
 
-  static pushToPipe(pipeBuf, fnIdx, pipes, value) {
+  static makeParameters(...args) {
+    const parameters = [
+      new FpArgumentOrder(),
+      new FpOutputPipes(),
+      new FpErrorPipes(),
+      new FpMapIndex(),
+    ];
+    _.forEach(args, (v) => {
+      if (v instanceof FpArgumentOrder) {
+        parameters[0] = v;
+      } else if (v instanceof FpOutputPipes) {
+        parameters[1] = v;
+      } else if (v instanceof FpErrorPipes) {
+        parameters[2] = v;
+      } else if (v instanceof FpMapIndex) {
+        parameters[3] = v;
+      }
+    });
+    return parameters;
+  }
+
+  static pushToPipe(pipeBuf, fnIdx, fpPipes, value) {
     const pipeBuffer = pipeBuf;
     const pushValueToPipeBuffer = (idx, v) => {
       if (_.isUndefined(pipeBuffer[idx])) {
@@ -28,47 +73,42 @@ class FunctionPipe {
       }
       pipeBuffer[idx].push(v);
     };
-
-    if (_.isArray(pipes)) {
-      _.forEach(pipes, (outIdx) => {
-        pushValueToPipeBuffer(fnIdx + outIdx, value);
-      });
-    } else if (_.isNumber(pipes)) {
-      pushValueToPipeBuffer(fnIdx + pipes, value);
-    } else {
-      pushValueToPipeBuffer(fnIdx + 1, value);
+    if (fpPipes.pipes.length === 0) {
+      fpPipes.pipes.push(1);
     }
+    _.forEach(fpPipes.pipes, (outIdx) => {
+      pushValueToPipeBuffer(fnIdx + outIdx, value);
+    });
   }
 
-  static reOrderArgs(fn, inputOrder) {
+  static reOrderArgs(fn, fpOrder) {
     let func = fn;
-    if (_.isArray(inputOrder)) {
-      func = _.rearg(fn, inputOrder);
+    if (fpOrder.order.length > 0) {
+      func = _.rearg(fn, fpOrder.order);
     }
     return func;
   }
 
-  newCatchThenFunction(fn, inputOrder, outPipes, errPipes) {
-    this.catchNumber += 1;
-    const fnIdx = this.functionNumber;
-    const erIdx = this.catchNumber;
-    const func = FunctionPipe.reOrderArgs(fn, inputOrder);
+  newCatchThenFunction(fn, fpOrder, fpOutPipes, fpErrPipes) {
+    this.mCatchNumber += 1;
+    const erIdx = this.mCatchNumber;
+    const func = FunctionPipe.reOrderArgs(fn, fpOrder);
 
     const wrapFunc = () => {
       if (!this.run) return {};
-      const args = _.get(this.pipeErrBuffer, erIdx, []);
+      const args = _.get(this.mPipeErrBuffer, erIdx, []);
       const result = func(...args);
 
       if (result instanceof Promise) {
         return result
-        .then((value) => {
-          FunctionPipe.pushToPipe(this.pipeErrBuffer, erIdx, outPipes, value);
-          return Promise.reject();
-        })
-        .catch((value) => {
-          FunctionPipe.pushToPipe(this.pipeErrBuffer, erIdx, errPipes, value);
-          return Promise.reject();
-        });
+          .then((value) => {
+            FunctionPipe.pushToPipe(this.mPipeErrBuffer, erIdx, fpOutPipes, value);
+            return Promise.reject();
+          })
+          .catch((value) => {
+            FunctionPipe.pushToPipe(this.mPipeErrBuffer, erIdx, fpErrPipes, value);
+            return Promise.reject();
+          });
       }
       return new Promise((resolve) => {
         resolve(result);
@@ -77,27 +117,27 @@ class FunctionPipe {
     return wrapFunc;
   }
 
-  newCatchFunction(fn, inputOrder, outPipes, errPipes) {
-    this.catchNumber += 1;
-    const fnIdx = this.functionNumber;
-    const erIdx = this.catchNumber;
-    const func = FunctionPipe.reOrderArgs(fn, inputOrder);
+  newCatchFunction(fn, fpOrder, fpOutPipes, fpErrPipes) {
+    this.mCatchNumber += 1;
+    const fnIdx = this.mFunctionNumber;
+    const erIdx = this.mCatchNumber;
+    const func = FunctionPipe.reOrderArgs(fn, fpOrder);
 
     const wrapFunc = () => {
       if (!this.run) return {};
-      const args = _.get(this.pipeErrBuffer, erIdx, []);
+      const args = _.get(this.mPipeErrBuffer, erIdx, []);
       const result = func(...args);
 
       if (result instanceof Promise) {
         return result
-        .then((value) => {
-          FunctionPipe.pushToPipe(this.pipeOutBuffer, fnIdx, outPipes, value);
-          return Promise.resolve();
-        })
-        .catch((value) => {
-          FunctionPipe.pushToPipe(this.pipeErrBuffer, erIdx, errPipes, value);
-          return Promise.reject();
-        });
+          .then((value) => {
+            FunctionPipe.pushToPipe(this.mPipeOutBuffer, fnIdx, fpOutPipes, value);
+            return Promise.resolve();
+          })
+          .catch((value) => {
+            FunctionPipe.pushToPipe(this.mPipeErrBuffer, erIdx, fpErrPipes, value);
+            return Promise.reject();
+          });
       }
       return new Promise((resolve) => {
         resolve(result);
@@ -106,48 +146,48 @@ class FunctionPipe {
     return wrapFunc;
   }
 
-  newPipeFunction(fn, inputOrder, outPipes, errPipes) {
-    this.functionNumber += 1;
-    const fnIdx = this.functionNumber;
-    const erIdx = this.catchNumber;
-    const func = FunctionPipe.reOrderArgs(fn, inputOrder);
+  newPipeFunction(fn, fpOrder, fpOutPipes, fpErrPipes) {
+    this.mFunctionNumber += 1;
+    const fnIdx = this.mFunctionNumber;
+    const erIdx = this.mCatchNumber;
+    const func = FunctionPipe.reOrderArgs(fn, fpOrder);
 
     const wrapFunc = () => {
       if (!this.run) return {};
-      const args = _.get(this.pipeOutBuffer, fnIdx, []);
+      const args = _.get(this.mPipeOutBuffer, fnIdx, []);
       const result = func(...args);
 
       if (result instanceof Promise) {
         return result
-        .then((value) => {
-          FunctionPipe.pushToPipe(this.pipeOutBuffer, fnIdx, outPipes, value);
-          return Promise.resolve();
-        })
-        .catch((value) => {
-          FunctionPipe.pushToPipe(this.pipeErrBuffer, erIdx, errPipes, value);
-          return Promise.reject();
-        });
+          .then((value) => {
+            FunctionPipe.pushToPipe(this.mPipeOutBuffer, fnIdx, fpOutPipes, value);
+            return Promise.resolve();
+          })
+          .catch((value) => {
+            FunctionPipe.pushToPipe(this.mPipeErrBuffer, erIdx, fpErrPipes, value);
+            return Promise.reject();
+          });
       }
-      FunctionPipe.pushToPipe(this.pipeOutBuffer, fnIdx, outPipes, result);
+      FunctionPipe.pushToPipe(this.mPipeOutBuffer, fnIdx, fpOutPipes, result);
       return Promise.resolve();
     };
     return wrapFunc;
   }
 
-  newMapFunction(fn, inputOrder, outPipes, errPipes, mapIndex) {
-    this.functionNumber += 1;
-    const fnIdx = this.functionNumber;
-    const erIdx = this.catchNumber;
-    const func = FunctionPipe.reOrderArgs(fn, inputOrder);
+  newMapFunction(fn, fpOrder, fpOutPipes, fpErrPipes, fpMapIndex) {
+    this.mFunctionNumber += 1;
+    const fnIdx = this.mFunctionNumber;
+    const erIdx = this.mCatchNumber;
+    const func = FunctionPipe.reOrderArgs(fn, fpOrder);
 
     const wrapFunc = () => {
       if (!this.run) return {};
-      const args = _.get(this.pipeOutBuffer, fnIdx, []);
-      const mapIndexes = _.concat([], mapIndex);
-      const firstMapArg = args[mapIndexes[0]];
+      const args = _.get(this.mPipeOutBuffer, fnIdx, []);
+
+      const firstMapArg = args[fpMapIndex.mapIndexes[0]];
       const promises = _.map(firstMapArg, (firstArg, row) => {
         const newArgs = _.map(args, (arg, col) => {
-          if (_.indexOf(mapIndexes, col) !== -1 && _.isArray(arg)) {
+          if (_.indexOf(fpMapIndex.mapIndexes, col) !== -1 && _.isArray(arg)) {
             return arg[row];
           }
           return arg;
@@ -156,64 +196,85 @@ class FunctionPipe {
       });
 
       return Promise.all(promises)
-      .then((value) => {
-        FunctionPipe.pushToPipe(this.pipeOutBuffer, fnIdx, outPipes, value);
-        return Promise.resolve();
-      })
-      .catch((value) => {
-        FunctionPipe.pushToPipe(this.pipeErrBuffer, erIdx, errPipes, value);
-        return Promise.reject();
-      });
+        .then((value) => {
+          FunctionPipe.pushToPipe(this.mPipeOutBuffer, fnIdx, fpOutPipes, value);
+          return Promise.resolve();
+        })
+        .catch((value) => {
+          FunctionPipe.pushToPipe(this.mPipeErrBuffer, erIdx, fpErrPipes, value);
+          return Promise.reject();
+        });
     };
     return wrapFunc;
   }
 
-  pipeMap(fn, inputOrder, outPipes, errPipes, mapIndex = 0) {
-    const wrapFunc = this.newMapFunction(fn, inputOrder, outPipes, errPipes, mapIndex);
-    this.promise = this.promise.then(wrapFunc);
+  pipeMap(fn, ...args) {
+    const parameters = FunctionPipe.makeParameters(...args);
+    const wrapFunc = this.newMapFunction(fn, ...parameters);
+    this.mPromise = this.mPromise.then(wrapFunc);
     return this;
   }
 
-  pipeMapSpread(fn, inputOrder, outPipes, errPipes, mapIndex = 0) {
-    return this.pipeMap(_.spread(fn), inputOrder, outPipes, errPipes, mapIndex);
+  pipeMapSpread(fn, ...args) {
+    return this.pipeMap(_.spread(fn), ...args);
   }
 
-  pipe(fn, inputOrder, outPipes, errPipes) {
-    const wrapFunc = this.newPipeFunction(fn, inputOrder, outPipes, errPipes);
-    this.promise = this.promise.then(wrapFunc);
+  pipe(fn, ...args) {
+    const parameters = FunctionPipe.makeParameters(...args);
+    const wrapFunc = this.newPipeFunction(fn, ...parameters);
+    this.mPromise = this.mPromise.then(wrapFunc);
     return this;
   }
 
-  pipeSpread(fn, inputOrder, outPipes, errPipes) {
-    return this.pipe(_.spread(fn), inputOrder, outPipes, errPipes);
+  pipeSpread(fn, ...args) {
+    return this.pipe(_.spread(fn), ...args);
   }
 
-  catch(fn, inputOrder, outPipes, errPipes) {
-    const func = this.newCatchFunction(fn, inputOrder, outPipes, errPipes);
-    this.promise = this.promise.catch(func);
+  catch(fn, ...args) {
+    const parameters = FunctionPipe.makeParameters(...args);
+    const func = this.newCatchFunction(fn, ...parameters);
+    this.mPromise = this.mPromise.catch(func);
     return this;
   }
 
-  catchThen(fn, inputOrder, outPipes, errPipes) {
-    const func = this.newCatchThenFunction(fn, inputOrder, outPipes, errPipes);
-    this.promise = this.promise.catch(func);
+  catchThen(fn, ...args) {
+    const parameters = FunctionPipe.makeParameters(...args);
+    const func = this.newCatchThenFunction(fn, ...parameters);
+    this.mPromise = this.mPromise.catch(func);
     return this;
   }
 
-  catchStop(fn, inputOrder, outPipes, errPipes) {
-    const func = this.newCatchFunction(fn, inputOrder, outPipes, errPipes);
-    this.promise = this.promise.catch((...args) => {
-      const r = func(...args);
+  catchStop(fn, ...args) {
+    const parameters = FunctionPipe.makeParameters(...args);
+    const func = this.newCatchFunction(fn, ...parameters);
+    this.mPromise = this.mPromise.catch((...args2) => {
+      const r = func(...args2);
       this.run = false;
       return r;
     });
     return this;
   }
 
-  getPromise() {
-    return this.promise
-    .then(() => Promise.resolve(_.get(this.pipeOutBuffer, this.functionNumber + 1, [])[0]))
-    .catch(() => Promise.reject(_.get(this.pipeErrBuffer, this.catchNumber + 1, [])[0]));
+  promise() {
+    return this.mPromise
+      .then(() => Promise.resolve(_.get(this.mPipeOutBuffer, this.mFunctionNumber + 1, [])[0]))
+      .catch(() => Promise.reject(_.get(this.mPipeErrBuffer, this.mCatchNumber + 1, [])[0]));
+  }
+
+  static order(...args) {
+    return new FpArgumentOrder(...args);
+  }
+
+  static out(...args) {
+    return new FpOutputPipes(...args);
+  }
+
+  static err(...args) {
+    return new FpErrorPipes(...args);
+  }
+
+  static mapIndex(...args) {
+    return new FpMapIndex(...args);
   }
 
   static lazyImpl(args) {
@@ -225,8 +286,8 @@ class FunctionPipe {
     });
   }
 
-  static pipe(func, inputOrder, outPipes, errPipes) {
-    return new FunctionPipe(func, inputOrder, outPipes, errPipes);
+  static pipe(fn, ...args) {
+    return new FunctionPipe(fn, ...args);
   }
 
   static lazy(...args) {
@@ -244,6 +305,13 @@ class FunctionPipe {
     }, ...args);
   }
 
+  static bindObj(fn, obj, ...args) {
+    return _.bind((...inArgs) => {
+      const calledArgs = FunctionPipe.lazyImpl(inArgs);
+      return fn(...calledArgs);
+    }, obj, ...args);
+  }
+
   static map(fn) {
     return (items, ...args) => Promise.resolve(_.map(items, (item, key) => fn(item, key, ...args)));
   }
@@ -256,7 +324,6 @@ class FunctionPipe {
       return Promise.resolve(items);
     };
   }
-
 }
 
 module.exports = FunctionPipe;
