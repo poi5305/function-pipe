@@ -27,6 +27,9 @@ class FpErrorPipes {
 
 class FpMapIndex {
   constructor(...args) {
+    if (args.length === 0) {
+      args.push(0);
+    }
     this.mapIndexes = args;
   }
 }
