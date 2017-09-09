@@ -4,10 +4,23 @@
   "description": "promise function pipe",
   "main": "function-pipe.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "mocha test.js"
   },
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "function",
+    "pipe",
+    "promise",
+    "lambda"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/poi5305/function-pipe.git"
+  },
+  "author": {
+    "name": "Min Te Chou",
+    "email": "poi5305@gmail.com"
+  },
+  "license": "Apache-2.0",
   "dependencies": {
     "lodash": "^4.17.4"
   },
