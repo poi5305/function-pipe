@@ -1,6 +1,6 @@
 {
   "name": "func-pipe",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "An Util for controlling promise function flow",
   "main": "func-pipe.js",
   "scripts": {
