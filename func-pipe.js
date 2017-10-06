@@ -320,10 +320,10 @@ class FunctionPipe {
   }
 
   static bindObj(fn, obj, ...args) {
-    return _.bind((...inArgs) => {
+    return _.partial((...inArgs) => {
       const calledArgs = FunctionPipe.lazyImpl(inArgs);
-      return fn(...calledArgs);
-    }, obj, ...args);
+      return _.bind(fn, obj, ...calledArgs)();
+    }, ...args);
   }
 
   static map(fn) {
