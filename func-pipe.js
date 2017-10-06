@@ -95,9 +95,9 @@ class FunctionPipe {
   static instanceOfPromise(obj) {
     if (_.isUndefined(obj)) {
       return false;
-    } else if (result instanceof Promise) {
+    } else if (obj instanceof Promise) {
       return true;
-    } else if (result.constructor !== undefined && result.constructor.name == 'Promise') {
+    } else if (obj.constructor !== undefined && obj.constructor.name == 'Promise') {
       return true;
     }
     return false;
@@ -113,7 +113,7 @@ class FunctionPipe {
       const args = _.get(this.mPipeErrBuffer, erIdx, []);
       const result = func(...args);
 
-      if (instanceOfPromise(result)) {
+      if (FunctionPipe.instanceOfPromise(result)) {
         return result
           .then((value) => {
             FunctionPipe.pushToPipe(this.mPipeErrBuffer, erIdx, fpOutPipes, value);
@@ -142,7 +142,7 @@ class FunctionPipe {
       const args = _.get(this.mPipeErrBuffer, erIdx, []);
       const result = func(...args);
 
-      if (instanceOfPromise(result)) {
+      if (FunctionPipe.instanceOfPromise(result)) {
         return result
           .then((value) => {
             FunctionPipe.pushToPipe(this.mPipeOutBuffer, fnIdx, fpOutPipes, value);
@@ -171,7 +171,7 @@ class FunctionPipe {
       const args = _.get(this.mPipeOutBuffer, fnIdx, []);
       const result = func(...args);
 
-      if (instanceOfPromise(result)) {
+      if (FunctionPipe.instanceOfPromise(result)) {
         return result
           .then((value) => {
             FunctionPipe.pushToPipe(this.mPipeOutBuffer, fnIdx, fpOutPipes, value);
