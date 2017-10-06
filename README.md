@@ -1,3 +1,16 @@
+## Function Pipe
+
+An Util for controlling promise function flow
+
+## Install
+
+```
+npm install --save func-pipe
+```
+
+## Usage
+
+```
 const _ = require('lodash');
 const { expect } = require('chai');
 
@@ -149,3 +162,4 @@ describe('Function Pipe Test', () => {
       }, fp.order(2, 0, 1)); // reorder parameters
   });
 });
+```

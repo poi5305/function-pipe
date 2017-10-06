@@ -1,14 +1,15 @@
 {
-  "name": "function-pipe",
+  "name": "func-pipe",
   "version": "1.0.0",
-  "description": "promise function pipe",
-  "main": "function-pipe.js",
+  "description": "An Util for controlling promise function flow",
+  "main": "func-pipe.js",
   "scripts": {
     "test": "mocha test.js"
   },
   "keywords": [
     "function",
     "pipe",
+    "pipeline",
     "promise",
     "lambda"
   ],
